@@ -1,4 +1,3 @@
-import ts, { factory, SyntaxKind } from 'typescript';
 import {
   GeneratedClientFunctionWithNodes,
   GeneratedSchemaWithNode,
@@ -19,9 +18,19 @@ import {
   PluginConfig,
   PluginFile,
   PluginFileGeneratorConfig,
+  PluginFilePostBuildHook,
+  PluginFileReader,
 } from '@pentops/jsonapi-jdef-ts-generator';
 import { camelCase, constantCase, sentenceCase } from 'change-case';
 import { match, P } from 'ts-pattern';
+import { Project, SourceFile, Statement, SyntaxKind, ts } from 'ts-morph';
+
+const { factory } = ts;
+
+export const pluginFileReader: PluginFileReader<SourceFile> = (filePath) =>
+  new Promise((resolve) => {
+    resolve(new Project({ useInMemoryFileSystem: true }).addSourceFileAtPath(filePath));
+  });
 
 export const REACT_TABLE_STATE_PSM_IMPORT_PATH = '@pentops/react-table-state-psm';
 export const REACT_TABLE_STATE_PSM_BASE_TABLE_FILTER_TYPE_NAME = 'BaseTableFilter';
@@ -53,7 +62,7 @@ export enum ReactTableStatePSMFilterType {
 }
 
 export type FilterTypeReferenceWriter = (
-  file: PluginFile,
+  file: PluginFile<SourceFile>,
   generatedFunction: GeneratedClientFunctionWithNodes,
   filterEnum: GeneratedSchemaWithNode<ParsedEnum>,
 ) => ts.TypeReferenceNode;
@@ -65,7 +74,7 @@ export type VariableNameWriter = (generatedFunction: GeneratedClientFunctionWith
 export interface GeneratorHookOptions {
   generatedStatement: ts.VariableStatement;
   generatedFunction: GeneratedClientFunctionWithNodes;
-  file: PluginFile;
+  file: PluginFile<SourceFile>;
 }
 
 export type GeneratorHook = (options: GeneratorHookOptions) => ts.VariableStatement;
@@ -73,7 +82,7 @@ export type GeneratorHook = (options: GeneratorHookOptions) => ts.VariableStatem
 export type FilterDependencyInjectorFunction = (argumentName: string, typeReference: ts.TypeReferenceNode | string) => void;
 
 export interface FilterTypeDefinitionWriterOptions<TFieldSchema extends ParsedSchema = ParsedSchema> {
-  file: PluginFile;
+  file: PluginFile<SourceFile>;
   generatedFunction: GeneratedClientFunctionWithNodes;
   filterEnum: GeneratedSchemaWithNode<ParsedEnum>;
   field: ParsedEnumValueDescription<TFieldSchema>;
@@ -157,7 +166,7 @@ export const defaultFloatFilterDefinitionBuilder: FilterTypeDefinitionWriter<Par
     factory.createPropertyAssignment(ReactTableStatePSMFilterType.numeric, factory.createObjectLiteralExpression([])),
   ]);
 
-export function addTypeImportIfEnum(file: PluginFile, generatedSchema: GeneratedSchemaWithNode<ParsedEnum>) {
+export function addTypeImportIfEnum(file: PluginFile<SourceFile>, generatedSchema: GeneratedSchemaWithNode<ParsedEnum>) {
   if (generatedSchema.node.kind === SyntaxKind.EnumDeclaration) {
     file.addGeneratedTypeImport(generatedSchema.generatedName);
   }
@@ -396,7 +405,7 @@ const defaultFilterTypeDefinitionWriter: FilterTypeDefinitionWriter = (options) 
 };
 
 const defaultFilterTypeReferenceWriter: FilterTypeReferenceWriter = (
-  file: PluginFile,
+  file: PluginFile<SourceFile>,
   _generatedFunction: GeneratedClientFunctionWithNodes,
   filterEnum: GeneratedSchemaWithNode<ParsedEnum>,
 ) => {
@@ -430,7 +439,12 @@ const defaultFilterDefinitionVariableNameWriter: FilterDefinitionVariableNameWri
   return camelCase(isFunction ? `get-${base}` : base);
 };
 
-export interface PSMTablePluginConfig extends PluginConfig {
+export type StatementConflictHandler = (newSource: Statement | undefined, existingSource: Statement | undefined) => Statement | undefined;
+
+export const defaultStatementConflictHandler: StatementConflictHandler = (newSource) => newSource;
+
+export interface PSMTablePluginConfig extends PluginConfig<SourceFile> {
+  statementConflictHandler: StatementConflictHandler;
   filter: {
     afterBuildInitialValuesNodeHook?: GeneratorHook;
     afterBuildFilterTypeDefinitionHook?: FilterTypeDefinitionHook;
@@ -458,30 +472,138 @@ export type PSMTablePluginFilterConfigInput = Optional<
 export type PSMTablePluginSortConfigInput = Optional<PSMTablePluginConfig['sort'], 'initialValuesVariableNameWriter'>;
 
 export type PSMTablePluginConfigInput = Optional<
-  Omit<PSMTablePluginConfig, 'filter'> & { filter: PSMTablePluginFilterConfigInput; sort: PSMTablePluginSortConfigInput },
-  'filter' | 'sort'
+  Omit<PSMTablePluginConfig, 'filter' | 'sort' | 'defaultExistingFileReader' | 'defaultFileHooks'> & {
+  filter: PSMTablePluginFilterConfigInput;
+  sort: PSMTablePluginSortConfigInput;
+},
+  'filter' | 'sort' | 'statementConflictHandler'
 >;
 
-export class PSMTableConfigPlugin extends PluginBase<PluginFileGeneratorConfig, PSMTablePluginConfig> {
+function findMatchingVariableStatement(needle: Statement, haystack: Statement[]) {
+  if (needle.isKind(SyntaxKind.VariableStatement)) {
+    const needleName = needle.getDeclarations()[0]?.getName();
+
+    for (const searchStatement of haystack) {
+      if (searchStatement.isKind(SyntaxKind.VariableStatement)) {
+        for (const searchDeclaration of searchStatement.getDeclarations()) {
+          if (needleName === searchDeclaration.getName()) {
+            return searchStatement;
+          }
+        }
+      }
+    }
+  } else {
+    for (const searchStatement of haystack) {
+      if (needle.getText() === searchStatement.getText()) {
+        return searchStatement;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+export class PSMTableConfigPlugin extends PluginBase<SourceFile, PluginFileGeneratorConfig<SourceFile>, PSMTablePluginConfig> {
   name = 'PSMTableConfigPlugin';
 
+  private static getPostBuildHook(baseConfig: Omit<PSMTablePluginConfig, 'defaultFileHooks'>) {
+    const mergedPostBuildHook: PluginFilePostBuildHook<SourceFile> = (file, fileToWrite) => {
+      const { content } = fileToWrite;
+
+      if (!file.existingFileContent) {
+        return content;
+      }
+
+      // Check for existing content and merge it with the new content
+      const newFileAsSourceFile = new Project({ useInMemoryFileSystem: true }).createSourceFile(fileToWrite.fileName, content);
+
+      const newFileStatements = newFileAsSourceFile.getStatements();
+      const existingFileStatements = file.existingFileContent?.getStatements() || [];
+      const handledStatements = new Set<Statement>();
+
+      for (const newStatement of newFileStatements) {
+        const existingStatement = findMatchingVariableStatement(newStatement, existingFileStatements);
+
+        handledStatements.add(newStatement);
+
+        if (existingStatement) {
+          handledStatements.add(existingStatement);
+        }
+
+        if (newStatement.getText() !== existingStatement?.getText()) {
+          const out = baseConfig.statementConflictHandler(newStatement, existingStatement);
+
+          if (out) {
+            if (out.getText() !== newStatement.getText()) {
+              newStatement.replaceWithText(out.getText());
+            }
+          } else {
+            newStatement.remove();
+          }
+        }
+      }
+
+      for (const existingStatement of existingFileStatements) {
+        if (!handledStatements.has(existingStatement)) {
+          const newStatement = findMatchingVariableStatement(existingStatement, newFileStatements);
+
+          if (newStatement) {
+            handledStatements.add(newStatement);
+          }
+
+          if (!newStatement || existingStatement.getText() !== newStatement.getText()) {
+            const out = baseConfig.statementConflictHandler(newStatement, existingStatement);
+
+            if (out) {
+              if (!newStatement) {
+                newFileAsSourceFile.addStatements(out.getText());
+              } else if (out.getText() !== newStatement.getText()) {
+                newStatement.replaceWithText(out.getText());
+              }
+            }
+          }
+        }
+      }
+
+      newFileAsSourceFile.saveSync();
+
+      return newFileAsSourceFile.getFullText();
+    };
+
+    return mergedPostBuildHook;
+  }
+
   private static buildConfig(config: PSMTablePluginConfigInput): PSMTablePluginConfig {
-    return {
-      ...config,
-      filter: {
-        ...config.filter,
-        definitionVariableNameWriter: config.filter?.definitionVariableNameWriter || defaultFilterDefinitionVariableNameWriter,
-        initialValuesVariableNameWriter: config.filter?.initialValuesVariableNameWriter || defaultFilterVariableNameWriter,
-        typeDefinitionWriter: config.filter?.typeDefinitionWriter || defaultFilterTypeDefinitionWriter,
-        typeDefinitionWriterConfig: {
-          ...defaultFilterTypeDefinitionWriterConfig,
-          ...config.filter?.typeDefinitionWriterConfig,
-        },
-        typeReferenceWriter: config.filter?.typeReferenceWriter || defaultFilterTypeReferenceWriter,
+    const filterConfig = {
+      ...config.filter,
+      statementConflictHandler: config.statementConflictHandler || defaultStatementConflictHandler,
+      definitionVariableNameWriter: config.filter?.definitionVariableNameWriter || defaultFilterDefinitionVariableNameWriter,
+      initialValuesVariableNameWriter: config.filter?.initialValuesVariableNameWriter || defaultFilterVariableNameWriter,
+      typeDefinitionWriter: config.filter?.typeDefinitionWriter || defaultFilterTypeDefinitionWriter,
+      typeDefinitionWriterConfig: {
+        ...defaultFilterTypeDefinitionWriterConfig,
+        ...config.filter?.typeDefinitionWriterConfig,
       },
-      sort: {
-        ...config.sort,
-        initialValuesVariableNameWriter: config.sort?.initialValuesVariableNameWriter || defaultSortVariableNameWriter,
+      typeReferenceWriter: config.filter?.typeReferenceWriter || defaultFilterTypeReferenceWriter,
+    };
+
+    const sortConfig = {
+      ...config.sort,
+      initialValuesVariableNameWriter: config.sort?.initialValuesVariableNameWriter || defaultSortVariableNameWriter,
+    };
+
+    const baseConfig: Omit<PSMTablePluginConfig, 'defaultFileHooks'> = {
+      ...config,
+      statementConflictHandler: config.statementConflictHandler || defaultStatementConflictHandler,
+      defaultExistingFileReader: pluginFileReader,
+      filter: filterConfig,
+      sort: sortConfig,
+    };
+
+    return {
+      ...baseConfig,
+      defaultFileHooks: {
+        postBuildHook: PSMTableConfigPlugin.getPostBuildHook(baseConfig),
       },
     };
   }
@@ -495,7 +617,7 @@ export class PSMTableConfigPlugin extends PluginBase<PluginFileGeneratorConfig, 
     return fieldSchema ? this.generatedSchemas.get(getFullGRPCName(fieldSchema)) : undefined;
   }
 
-  private buildTableFilterDefinitions(file: PluginFile, generatedFunction: GeneratedClientFunctionWithNodes) {
+  private buildTableFilterDefinitions(file: PluginFile<SourceFile>, generatedFunction: GeneratedClientFunctionWithNodes) {
     const elements: ts.Expression[] = [];
     const filterDependencies = new Map<string, ts.TypeReferenceNode>();
 
@@ -544,9 +666,11 @@ export class PSMTableConfigPlugin extends PluginBase<PluginFileGeneratorConfig, 
 
       let variableStatement: ts.VariableStatement | undefined;
 
+      const isGetterFunction = filterDependencies.size > 0;
+      const variableStatementName = this.pluginConfig.filter.definitionVariableNameWriter(generatedFunction, isGetterFunction);
+
       if (elements.length) {
         const arrayLiteralExpression = factory.createArrayLiteralExpression(elements, true);
-        const isGetterFunction = filterDependencies.size > 0;
 
         file.addGeneratedTypeImport(generatedFunction.method.list.filterableFields.generatedName);
 
@@ -555,7 +679,7 @@ export class PSMTableConfigPlugin extends PluginBase<PluginFileGeneratorConfig, 
           factory.createVariableDeclarationList(
             [
               factory.createVariableDeclaration(
-                this.pluginConfig.filter.definitionVariableNameWriter(generatedFunction, isGetterFunction),
+                variableStatementName,
                 undefined,
                 filterTypeReference ? factory.createArrayTypeNode(filterTypeReference) : undefined,
                 isGetterFunction
@@ -583,7 +707,7 @@ export class PSMTableConfigPlugin extends PluginBase<PluginFileGeneratorConfig, 
     }
   }
 
-  private buildDefaultTableFilters(file: PluginFile, generatedFunction: GeneratedClientFunctionWithNodes) {
+  private buildDefaultTableFilters(file: PluginFile<SourceFile>, generatedFunction: GeneratedClientFunctionWithNodes) {
     if (generatedFunction.method.rootEntitySchema && generatedFunction.method.list?.filterableFields) {
       const elements: ts.Expression[] = [];
 
@@ -725,6 +849,8 @@ export class PSMTableConfigPlugin extends PluginBase<PluginFileGeneratorConfig, 
         }
       }
 
+      const variableStatementName = this.pluginConfig.filter.initialValuesVariableNameWriter(generatedFunction);
+
       if (elements.length) {
         // Import the enum to reference it
         file.addGeneratedTypeImport(generatedFunction.method.list.filterableFields.generatedName);
@@ -735,7 +861,7 @@ export class PSMTableConfigPlugin extends PluginBase<PluginFileGeneratorConfig, 
           factory.createVariableDeclarationList(
             [
               factory.createVariableDeclaration(
-                this.pluginConfig.filter.initialValuesVariableNameWriter(generatedFunction),
+                variableStatementName,
                 undefined,
                 factory.createTypeReferenceNode(FILTER_STATE_TYPE_NAME, [
                   factory.createTypeReferenceNode(generatedFunction.method.list.filterableFields.generatedName),
@@ -762,7 +888,7 @@ export class PSMTableConfigPlugin extends PluginBase<PluginFileGeneratorConfig, 
     }
   }
 
-  private buildDefaultTableSorts(file: PluginFile, generatedFunction: GeneratedClientFunctionWithNodes) {
+  private buildDefaultTableSorts(file: PluginFile<SourceFile>, generatedFunction: GeneratedClientFunctionWithNodes) {
     if (generatedFunction.method.rootEntitySchema && generatedFunction.method.list?.sortableFields) {
       const elements: ts.Expression[] = [];
 
@@ -784,6 +910,8 @@ export class PSMTableConfigPlugin extends PluginBase<PluginFileGeneratorConfig, 
         }
       }
 
+      const variableStatementName = this.pluginConfig.sort.initialValuesVariableNameWriter(generatedFunction);
+
       if (elements.length) {
         // Import the enum to reference it
         file.addGeneratedTypeImport(generatedFunction.method.list.sortableFields.generatedName);
@@ -794,7 +922,7 @@ export class PSMTableConfigPlugin extends PluginBase<PluginFileGeneratorConfig, 
           factory.createVariableDeclarationList(
             [
               factory.createVariableDeclaration(
-                this.pluginConfig.sort.initialValuesVariableNameWriter(generatedFunction),
+                variableStatementName,
                 undefined,
                 factory.createTypeReferenceNode(SORTING_STATE_TYPE_NAME, [
                   factory.createTypeReferenceNode(generatedFunction.method.list.sortableFields.generatedName),
@@ -826,8 +954,8 @@ export class PSMTableConfigPlugin extends PluginBase<PluginFileGeneratorConfig, 
       for (const generatedFunction of this.generatedClientFunctions) {
         if (file.isFileForGeneratedClientFunction(generatedFunction)) {
           this.buildDefaultTableSorts(file, generatedFunction);
-          this.buildDefaultTableFilters(file, generatedFunction);
-          this.buildTableFilterDefinitions(file, generatedFunction);
+          // this.buildDefaultTableFilters(file, generatedFunction);
+          // this.buildTableFilterDefinitions(file, generatedFunction);
         }
       }
 
