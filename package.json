@@ -37,7 +37,7 @@
     "ts-morph": "^23.0.0"
   },
   "peerDependencies": {
-    "@pentops/jsonapi-jdef-ts-generator": ">=0.0.63 < 0.1.0",
+    "@pentops/jsonapi-jdef-ts-generator": ">=0.0.68 < 0.1.0",
     "@pentops/react-table-state-psm": ">=0.0.6 < 0.1.0"
   }
 }
