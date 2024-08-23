@@ -507,10 +507,12 @@ export class PSMTableConfigPlugin extends PluginBase<SourceFile, PluginFileGener
   name = 'PSMTableConfigPlugin';
 
   private static getPostBuildHook(baseConfig: Omit<PSMTablePluginConfig, 'defaultFileHooks'>) {
-    const mergedPostBuildHook: PluginFilePostBuildHook<SourceFile> = (file, fileToWrite) => {
+    const mergedPostBuildHook: PluginFilePostBuildHook<SourceFile> = async (file, fileToWrite) => {
       const { content } = fileToWrite;
 
-      if (!file.existingFileContent) {
+      const existingFileContent = await file.getExistingFileContent();
+
+      if (!existingFileContent) {
         return content;
       }
 
@@ -518,7 +520,7 @@ export class PSMTableConfigPlugin extends PluginBase<SourceFile, PluginFileGener
       const newFileAsSourceFile = new Project({ useInMemoryFileSystem: true }).createSourceFile(fileToWrite.fileName, content);
 
       const newFileStatements = newFileAsSourceFile.getStatements();
-      const existingFileStatements = file.existingFileContent?.getStatements() || [];
+      const existingFileStatements = existingFileContent.getStatements() || [];
       const handledStatements = new Set<Statement>();
 
       for (const newStatement of newFileStatements) {
@@ -954,8 +956,8 @@ export class PSMTableConfigPlugin extends PluginBase<SourceFile, PluginFileGener
       for (const generatedFunction of this.generatedClientFunctions) {
         if (file.isFileForGeneratedClientFunction(generatedFunction)) {
           this.buildDefaultTableSorts(file, generatedFunction);
-          // this.buildDefaultTableFilters(file, generatedFunction);
-          // this.buildTableFilterDefinitions(file, generatedFunction);
+          this.buildDefaultTableFilters(file, generatedFunction);
+          this.buildTableFilterDefinitions(file, generatedFunction);
         }
       }
 
