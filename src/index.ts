@@ -68,7 +68,7 @@ export type FilterTypeReferenceWriter = (
   file: PluginFile<SourceFile>,
   generatedFunction: GeneratedClientFunctionWithNodes,
   filterEnum: GeneratedSchemaWithNode<ParsedEnum>,
-) => ts.TypeReferenceNode;
+) => ts.TypeNode;
 
 export type FilterDefinitionVariableNameWriter = (generatedFunction: GeneratedClientFunctionWithNodes, isFunction: boolean) => string;
 
@@ -414,8 +414,8 @@ const defaultFilterTypeReferenceWriter: FilterTypeReferenceWriter = (
 ) => {
   file.addManualImport(
     REACT_TABLE_STATE_PSM_IMPORT_PATH,
-    [REACT_TABLE_STATE_PSM_BASE_TABLE_FILTER_TYPE_NAME],
-    [REACT_TABLE_STATE_PSM_BASE_TABLE_FILTER_TYPE_NAME],
+    [REACT_TABLE_STATE_PSM_BASE_TABLE_FILTER_TYPE_NAME, REACT_TABLE_STATE_PSM_BASE_TABLE_FILTER_TYPE_TYPE_NAME],
+    [REACT_TABLE_STATE_PSM_BASE_TABLE_FILTER_TYPE_NAME, REACT_TABLE_STATE_PSM_BASE_TABLE_FILTER_TYPE_TYPE_NAME],
   );
 
   const typeNodes: ts.TypeNode[] = [
@@ -424,7 +424,7 @@ const defaultFilterTypeReferenceWriter: FilterTypeReferenceWriter = (
     factory.createTypeReferenceNode(REACT_TABLE_STATE_PSM_BASE_TABLE_FILTER_TYPE_TYPE_NAME),
   ];
 
-  return factory.createTypeReferenceNode(REACT_TABLE_STATE_PSM_BASE_TABLE_FILTER_TYPE_NAME, typeNodes);
+  return factory.createArrayTypeNode(factory.createTypeReferenceNode(REACT_TABLE_STATE_PSM_BASE_TABLE_FILTER_TYPE_NAME, typeNodes));
 };
 
 const defaultSortVariableNameWriter: VariableNameWriter = (generatedFunction: GeneratedClientFunctionWithNodes) =>
@@ -631,12 +631,6 @@ export class PSMTableConfigPlugin extends PluginBase<SourceFile, PluginFileGener
     };
 
     if (generatedFunction.method.rootEntitySchema && generatedFunction.method.list?.filterableFields) {
-      const filterTypeReference = this.pluginConfig.filter.typeReferenceWriter(
-        file,
-        generatedFunction,
-        generatedFunction.method.list.filterableFields,
-      );
-
       for (const filterableField of generatedFunction.method.list.filterableFields.rawSchema.enum.options) {
         const fieldGeneratedSchema = this.getFieldGeneratedSchema(filterableField, generatedFunction.method.rootEntitySchema.rawSchema);
         let filterNode = this.pluginConfig.filter.typeDefinitionWriter({
@@ -678,6 +672,15 @@ export class PSMTableConfigPlugin extends PluginBase<SourceFile, PluginFileGener
         const arrayLiteralExpression = factory.createArrayLiteralExpression(elements, true);
 
         file.addGeneratedTypeImport(generatedFunction.method.list.filterableFields.generatedName);
+        const filterTypeReference = this.pluginConfig.filter.typeReferenceWriter(
+          file,
+          generatedFunction,
+          generatedFunction.method.list.filterableFields,
+        );
+
+        const filterDependencyParameters = Array.from(filterDependencies).map(([argName, typeRef]) =>
+          factory.createParameterDeclaration(undefined, undefined, argName, undefined, typeRef),
+        );
 
         variableStatement = factory.createVariableStatement(
           [factory.createModifier(SyntaxKind.ExportKeyword)],
@@ -686,14 +689,12 @@ export class PSMTableConfigPlugin extends PluginBase<SourceFile, PluginFileGener
               factory.createVariableDeclaration(
                 variableStatementName,
                 undefined,
-                filterTypeReference ? factory.createArrayTypeNode(filterTypeReference) : undefined,
+                isGetterFunction ? factory.createFunctionTypeNode([], filterDependencyParameters, filterTypeReference) : filterTypeReference,
                 isGetterFunction
                   ? factory.createArrowFunction(
                     undefined,
                     undefined,
-                    Array.from(filterDependencies).map(([argName, typeRef]) =>
-                      factory.createParameterDeclaration(undefined, undefined, argName, undefined, typeRef),
-                    ),
+                    filterDependencyParameters,
                     undefined,
                     factory.createToken(SyntaxKind.EqualsGreaterThanToken),
                     arrayLiteralExpression,
