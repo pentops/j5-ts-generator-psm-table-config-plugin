@@ -41,6 +41,7 @@ export const REACT_TABLE_STATE_PSM_BASE_TABLE_FILTER_TYPE_TYPE_NAME = 'BaseFilte
 export const SORTING_STATE_TYPE_NAME = 'SortingState';
 export const FILTER_STATE_TYPE_NAME = 'FilterState';
 export const PSM_ID_PARAMETER_NAME = 'id';
+export const PSM_LABEL_PARAMETER_NAME = 'label';
 export const PSM_VALUE_PARAMETER_NAME = 'value';
 export const PSM_EXACT_PARAMETER_NAME = 'exact';
 export const PSM_IN_PARAMETER_NAME = 'in';
@@ -94,6 +95,7 @@ export interface FilterTypeDefinitionWriterOptions<TFieldSchema extends ParsedSc
   // the dependencies as arguments
   injectDependency: FilterDependencyInjectorFunction;
   config: FilterTypeDefinitionWriterConfig;
+  labelWriter: FilterTypeDefinitionLabelWriter<TFieldSchema>;
 }
 
 export type FilterTypeDefinitionWriter<TFieldSchema extends ParsedSchema = ParsedSchema> = (
@@ -104,15 +106,17 @@ export type FilterTypeDefinitionHookOptions<TFieldSchema extends ParsedSchema = 
   generatedExpression: ts.ObjectLiteralExpression;
 };
 
+export type FilterTypeDefinitionLabelWriter<TFieldSchema extends ParsedSchema = ParsedSchema> = (options: Omit<FilterTypeDefinitionWriterOptions<TFieldSchema>, 'labelWriter'>) => string | ts.Expression | undefined;
+
 export type FilterTypeDefinitionHook = (options: FilterTypeDefinitionHookOptions) => ts.ObjectLiteralExpression | undefined;
 
-export type FilterTypeDefinitionEnumOptionLabelWriterOptions = Omit<FilterTypeDefinitionWriterOptions<ParsedEnum>, 'config'>;
+export type FilterTypeDefinitionEnumOptionLabelWriterOptions = Omit<FilterTypeDefinitionWriterOptions<ParsedEnum>, 'config' | 'labelWriter'>;
 
 export type EnumOptionLabelWriter = (options: FilterTypeDefinitionEnumOptionLabelWriterOptions) => string | ts.Expression | undefined;
 
 export const defaultEnumOptionLabelWriter: EnumOptionLabelWriter = ({ field }) => sentenceCase(field.name.split('.').pop() || field.name);
 
-export type FilterTypeDefinitionOneOfOptionLabelWriterOptions = Omit<FilterTypeDefinitionWriterOptions<ParsedOneOf>, 'config'>;
+export type FilterTypeDefinitionOneOfOptionLabelWriterOptions = Omit<FilterTypeDefinitionWriterOptions<ParsedOneOf>, 'config' | 'labelWriter'>;
 
 export type OneOfOptionLabelWriter = (options: FilterTypeDefinitionOneOfOptionLabelWriterOptions) => string | ts.Expression | undefined;
 
@@ -296,7 +300,7 @@ export const defaultFilterTypeDefinitionWriterConfig: FilterTypeDefinitionWriter
 };
 
 const defaultFilterTypeDefinitionWriter: FilterTypeDefinitionWriter = (options) => {
-  const { file, filterEnum, field, generatedFunction, generatedFieldSchema, injectDependency, config } = options;
+  const { file, filterEnum, field, generatedFunction, generatedFieldSchema, injectDependency, labelWriter, config } = options;
   const keyName = filterEnum.generatedValueNames.get(field.name);
   const idExpression = buildEnumIdExpression(filterEnum, keyName);
 
@@ -312,6 +316,7 @@ const defaultFilterTypeDefinitionWriter: FilterTypeDefinitionWriter = (options) 
           generatedFieldSchema: generatedFieldSchema as GeneratedSchemaWithNode<ParsedString>,
           injectDependency,
           config,
+          labelWriter,
         }),
       )
       .with({ genericReferenceToSchema: { string: P.not(P.nullish) } }, (f) =>
@@ -323,6 +328,7 @@ const defaultFilterTypeDefinitionWriter: FilterTypeDefinitionWriter = (options) 
           generatedFieldSchema: generatedFieldSchema as GeneratedSchemaWithNode<ParsedString>,
           injectDependency,
           config,
+          labelWriter,
         }),
       )
       .with({ genericReferenceToSchema: { key: P.not(P.nullish) } }, (f) =>
@@ -334,6 +340,7 @@ const defaultFilterTypeDefinitionWriter: FilterTypeDefinitionWriter = (options) 
           generatedFieldSchema: generatedFieldSchema as GeneratedSchemaWithNode<ParsedKey>,
           injectDependency,
           config,
+          labelWriter,
         }),
       )
       .with({ genericReferenceToSchema: { oneOf: P.not(P.nullish) } }, (f) =>
@@ -345,6 +352,7 @@ const defaultFilterTypeDefinitionWriter: FilterTypeDefinitionWriter = (options) 
           generatedFieldSchema: generatedFieldSchema as GeneratedSchemaWithNode<ParsedOneOf>,
           injectDependency,
           config,
+          labelWriter,
         }),
       )
       .with({ genericReferenceToSchema: { enum: P.not(P.nullish) } }, (f) =>
@@ -356,6 +364,7 @@ const defaultFilterTypeDefinitionWriter: FilterTypeDefinitionWriter = (options) 
           generatedFieldSchema: generatedFieldSchema as GeneratedSchemaWithNode<ParsedEnum>,
           injectDependency,
           config,
+          labelWriter,
         }),
       )
       .with({ genericReferenceToSchema: { boolean: P.not(P.nullish) } }, (f) =>
@@ -367,6 +376,7 @@ const defaultFilterTypeDefinitionWriter: FilterTypeDefinitionWriter = (options) 
           generatedFieldSchema: generatedFieldSchema as GeneratedSchemaWithNode<ParsedBoolean>,
           injectDependency,
           config,
+          labelWriter,
         }),
       )
       .with({ genericReferenceToSchema: { integer: P.not(P.nullish) } }, (f) =>
@@ -378,6 +388,7 @@ const defaultFilterTypeDefinitionWriter: FilterTypeDefinitionWriter = (options) 
           generatedFieldSchema: generatedFieldSchema as GeneratedSchemaWithNode<ParsedInteger>,
           injectDependency,
           config,
+          labelWriter,
         }),
       )
       .with({ genericReferenceToSchema: { float: P.not(P.nullish) } }, (f) =>
@@ -389,14 +400,19 @@ const defaultFilterTypeDefinitionWriter: FilterTypeDefinitionWriter = (options) 
           generatedFieldSchema: generatedFieldSchema as GeneratedSchemaWithNode<ParsedFloat>,
           injectDependency,
           config,
+          labelWriter,
         }),
       )
       .otherwise(() => undefined);
 
     if (typeObjectLiteralExpression) {
+      const rawLabel = labelWriter(options);
+      const label = (typeof rawLabel === 'string' ? factory.createStringLiteral(rawLabel, true) : rawLabel) || idExpression;
+
       return factory.createObjectLiteralExpression(
         [
           factory.createPropertyAssignment(PSM_ID_PARAMETER_NAME, idExpression),
+          factory.createPropertyAssignment(PSM_LABEL_PARAMETER_NAME, label),
           factory.createPropertyAssignment(PSM_FILTER_TYPE_PARAMETER_NAME, typeObjectLiteralExpression),
         ],
         true,
@@ -442,6 +458,8 @@ const defaultFilterDefinitionVariableNameWriter: FilterDefinitionVariableNameWri
   return camelCase(isFunction ? `get-${base}` : base);
 };
 
+const defaultFilterLabelWriter: FilterTypeDefinitionLabelWriter = ({ field }) => sentenceCase(field.name.split('.').pop() || field.name);
+
 export type StatementConflictHandler = (newSource: Statement | undefined, existingSource: Statement | undefined) => Statement | undefined;
 
 export const defaultStatementConflictHandler: StatementConflictHandler = (newSource) => newSource;
@@ -456,6 +474,7 @@ export interface PSMTablePluginConfig extends PluginConfig<SourceFile> {
     typeDefinitionWriter: FilterTypeDefinitionWriter;
     typeDefinitionWriterConfig: FilterTypeDefinitionWriterConfig;
     typeReferenceWriter: FilterTypeReferenceWriter;
+    labelWriter: FilterTypeDefinitionLabelWriter;
   };
   sort: {
     afterBuildInitialValuesNodeHook?: GeneratorHook;
@@ -469,7 +488,7 @@ export type PSMTablePluginFilterConfigInput = Optional<
   Omit<PSMTablePluginConfig['filter'], 'typeDefinitionWriterConfig'> & {
   typeDefinitionWriterConfig: PSMTablePluginFilterTypeDefinitionWriterConfigInput;
 },
-  'definitionVariableNameWriter' | 'initialValuesVariableNameWriter' | 'typeDefinitionWriter' | 'typeDefinitionWriterConfig' | 'typeReferenceWriter'
+  'definitionVariableNameWriter' | 'initialValuesVariableNameWriter' | 'typeDefinitionWriter' | 'typeDefinitionWriterConfig' | 'typeReferenceWriter' | 'labelWriter'
 >;
 
 export type PSMTablePluginSortConfigInput = Optional<PSMTablePluginConfig['sort'], 'initialValuesVariableNameWriter'>;
@@ -590,6 +609,7 @@ export class PSMTableConfigPlugin extends PluginBase<SourceFile, PluginFileGener
         ...config.filter?.typeDefinitionWriterConfig,
       },
       typeReferenceWriter: config.filter?.typeReferenceWriter || defaultFilterTypeReferenceWriter,
+      labelWriter: config.filter?.labelWriter || defaultFilterLabelWriter,
     };
 
     const sortConfig = {
@@ -641,6 +661,7 @@ export class PSMTableConfigPlugin extends PluginBase<SourceFile, PluginFileGener
           generatedFieldSchema: fieldGeneratedSchema,
           injectDependency: addDependency,
           config: this.pluginConfig.filter.typeDefinitionWriterConfig,
+          labelWriter: this.pluginConfig.filter.labelWriter,
         });
 
         if (filterNode) {
@@ -654,6 +675,7 @@ export class PSMTableConfigPlugin extends PluginBase<SourceFile, PluginFileGener
               generatedFieldSchema: fieldGeneratedSchema,
               injectDependency: addDependency,
               config: this.pluginConfig.filter.typeDefinitionWriterConfig,
+              labelWriter: this.pluginConfig.filter.labelWriter,
             });
           }
 
@@ -689,7 +711,7 @@ export class PSMTableConfigPlugin extends PluginBase<SourceFile, PluginFileGener
               factory.createVariableDeclaration(
                 variableStatementName,
                 undefined,
-                isGetterFunction ? factory.createFunctionTypeNode([], filterDependencyParameters, filterTypeReference) : filterTypeReference,
+                isGetterFunction ? factory.createFunctionTypeNode(undefined, filterDependencyParameters, filterTypeReference) : filterTypeReference,
                 isGetterFunction
                   ? factory.createArrowFunction(
                     undefined,
