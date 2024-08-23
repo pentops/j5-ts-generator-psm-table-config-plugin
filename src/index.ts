@@ -27,10 +27,13 @@ import { Project, SourceFile, Statement, SyntaxKind, ts } from 'ts-morph';
 
 const { factory } = ts;
 
-export const pluginFileReader: PluginFileReader<SourceFile> = (filePath) =>
-  new Promise((resolve) => {
-    resolve(new Project({ useInMemoryFileSystem: true }).addSourceFileAtPath(filePath));
-  });
+export const pluginFileReader: PluginFileReader<SourceFile> = async (filePath) => {
+  try {
+    return new Project({ useInMemoryFileSystem: true }).addSourceFileAtPath(filePath);
+  } catch {
+    return undefined;
+  }
+}
 
 export const REACT_TABLE_STATE_PSM_IMPORT_PATH = '@pentops/react-table-state-psm';
 export const REACT_TABLE_STATE_PSM_BASE_TABLE_FILTER_TYPE_NAME = 'BaseTableFilter';
