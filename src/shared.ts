@@ -10,6 +10,7 @@ import {
   ParsedInteger,
   ParsedKey,
   ParsedOneOf,
+  ParsedRef,
   ParsedSchema,
   ParsedString,
   PluginFile,
@@ -46,7 +47,7 @@ export interface DefinitionWriterOptions<TFieldSchema extends ParsedSchema = Par
   file: PluginFile<SourceFile>;
   generatedFunction: GeneratedClientFunctionWithNodes;
   fieldEnum: GeneratedSchemaWithNode<ParsedEnum>;
-  field: ParsedEnumValueDescription<TFieldSchema>;
+  field: ParsedEnumValueDescription<TFieldSchema & ParsedRef>;
   generatedFieldSchema: GeneratedSchemaWithNode<TFieldSchema> | undefined;
   // If dependencies are added for any definition, the resulting generated definition will be a getter function that accepts
   // the dependencies as arguments

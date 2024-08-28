@@ -6,8 +6,8 @@ settings:
 
 dependencies:
   '@pentops/jsonapi-jdef-ts-generator':
-    specifier: ^0.0.81
-    version: 0.0.81(@pentops/jsonapi-request@0.0.4)
+    specifier: ^0.0.83
+    version: 0.0.83(@pentops/jsonapi-request@0.0.4)
   '@pentops/react-table-state-psm':
     specifier: '>=0.0.6 < 0.1.0'
     version: 0.0.6(react-dom@18.3.1)(react@18.3.1)
@@ -693,8 +693,8 @@ packages:
       fastq: 1.17.1
     dev: false
 
-  /@pentops/jsonapi-jdef-ts-generator@0.0.81(@pentops/jsonapi-request@0.0.4):
-    resolution: {integrity: sha512-RFjrsZJ2/x+60GlAv/yN37Xtu4Dvv5p6fseLG/OuDQnjg7YLAGJVvqxOqqgRZcEI08JC6t1GJ4QNUdrtKmFkpw==}
+  /@pentops/jsonapi-jdef-ts-generator@0.0.83(@pentops/jsonapi-request@0.0.4):
+    resolution: {integrity: sha512-zqUmBklsS7mHczOP3CkVvOYCnfdiBt4BtRANIKQFGC849VgUsknvtRFcUJuP79OG1PPIWVtuOR8Fer+6cLs+DA==}
     hasBin: true
     peerDependencies:
       '@pentops/jsonapi-request': '>=0.0.4'
