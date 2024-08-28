@@ -37,7 +37,7 @@
     "ts-pattern": "^5.3.1"
   },
   "peerDependencies": {
-    "@pentops/jsonapi-jdef-ts-generator": ">=0.0.82 < 0.1.0",
+    "@pentops/jsonapi-jdef-ts-generator": ">=0.0.83 < 0.1.0",
     "@pentops/react-table-state-psm": ">=0.0.6 < 0.1.0"
   }
 }
