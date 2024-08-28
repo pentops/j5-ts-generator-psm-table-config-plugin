@@ -45,9 +45,11 @@ export const defaultSearchTypeReferenceWriter: DefinitionTypeReferenceWriter = (
     [REACT_TABLE_STATE_PSM_BASE_TABLE_SEARCH_TYPE_NAME],
   );
 
-  return factory.createTypeReferenceNode(REACT_TABLE_STATE_PSM_BASE_TABLE_SEARCH_TYPE_NAME, [
-    fieldEnum.generatedName ? factory.createTypeReferenceNode(fieldEnum.generatedName) : factory.createKeywordTypeNode(SyntaxKind.StringKeyword),
-  ]);
+  return factory.createArrayTypeNode(
+    factory.createTypeReferenceNode(REACT_TABLE_STATE_PSM_BASE_TABLE_SEARCH_TYPE_NAME, [
+      fieldEnum.generatedName ? factory.createTypeReferenceNode(fieldEnum.generatedName) : factory.createKeywordTypeNode(SyntaxKind.StringKeyword),
+    ]),
+  );
 };
 
 export const defaultSearchDefinitionVariableNameWriter: DefinitionVariableNameWriter = (
