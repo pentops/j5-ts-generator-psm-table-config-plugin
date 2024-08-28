@@ -1,5 +1,5 @@
 import { SourceFile, SyntaxKind, ts } from 'ts-morph';
-import { camelCase, constantCase, sentenceCase } from 'change-case';
+import { camelCase, constantCase, pascalCase, sentenceCase } from 'change-case';
 import {
   GeneratedClientFunctionWithNodes,
   GeneratedSchemaWithNode,
@@ -67,7 +67,11 @@ export const defaultFilterDefinitionVariableNameWriter: DefinitionVariableNameWr
 ) => {
   const base = `${generatedFunction.generatedName}-Filters`;
 
-  return camelCase(isFunction ? `get-${base}` : base);
+  if (isFunction) {
+    return pascalCase(base);
+  }
+
+  return camelCase(`get-${base}`);
 };
 
 export const defaultFilterLabelWriter: DefinitionLabelWriter = ({ field }) => sentenceCase(field.name.split('.').pop() || field.name);

@@ -1,6 +1,6 @@
 import { SourceFile, SyntaxKind, ts } from 'ts-morph';
 import { GeneratedClientFunctionWithNodes, GeneratedSchemaWithNode, ParsedEnum, PluginFile } from '@pentops/jsonapi-jdef-ts-generator';
-import { camelCase, sentenceCase } from 'change-case';
+import { camelCase, pascalCase, sentenceCase } from 'change-case';
 import {
   buildEnumIdExpression,
   DefinitionLabelWriter,
@@ -58,7 +58,11 @@ export const defaultSearchDefinitionVariableNameWriter: DefinitionVariableNameWr
 ) => {
   const base = `${generatedFunction.generatedName}-Search-Fields`;
 
-  return camelCase(isFunction ? `get-${base}` : base);
+  if (isFunction) {
+    return pascalCase(base);
+  }
+
+  return camelCase(`get-${base}`);
 };
 
 export const defaultSearchLabelWriter: DefinitionLabelWriter = ({ field }) => sentenceCase(field.name.split('.').pop() || field.name);
