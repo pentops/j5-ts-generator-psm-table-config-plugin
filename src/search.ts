@@ -59,10 +59,10 @@ export const defaultSearchDefinitionVariableNameWriter: DefinitionVariableNameWr
   const base = `${generatedFunction.generatedName}-Search-Fields`;
 
   if (isFunction) {
-    return pascalCase(base);
+    return camelCase(`get-${base}`);
   }
 
-  return camelCase(`get-${base}`);
+  return pascalCase(base);
 };
 
 export const defaultSearchLabelWriter: DefinitionLabelWriter = ({ field }) => sentenceCase(field.name.split('.').pop() || field.name);

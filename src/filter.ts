@@ -68,10 +68,10 @@ export const defaultFilterDefinitionVariableNameWriter: DefinitionVariableNameWr
   const base = `${generatedFunction.generatedName}-Filters`;
 
   if (isFunction) {
-    return pascalCase(base);
+    return camelCase(`get-${base}`);
   }
 
-  return camelCase(`get-${base}`);
+  return pascalCase(base);
 };
 
 export const defaultFilterLabelWriter: DefinitionLabelWriter = ({ field }) => sentenceCase(field.name.split('.').pop() || field.name);
