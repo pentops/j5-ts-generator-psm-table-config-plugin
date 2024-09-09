@@ -497,7 +497,7 @@ export class PSMTableConfigPlugin extends PluginBase<SourceFile, PluginFileGener
                   ),
                 ]),
             )
-            .with({ rawSchema: { boolean: P.not(P.nullish) } }, () =>
+            .with({ rawSchema: { bool: P.not(P.nullish) } }, () =>
               factory.createObjectLiteralExpression([
                 factory.createPropertyAssignment(PSM_ID_PARAMETER_NAME, idPropAssignment),
                 factory.createPropertyAssignment(

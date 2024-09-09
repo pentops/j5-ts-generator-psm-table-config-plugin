@@ -3,14 +3,13 @@ import { SourceFile, Statement, SyntaxKind, ts } from 'ts-morph';
 import {
   GeneratedClientFunctionWithNodes,
   GeneratedSchemaWithNode,
-  ParsedBoolean,
+  ParsedBool,
   ParsedEnum,
   ParsedEnumValueDescription,
   ParsedFloat,
   ParsedInteger,
   ParsedKey,
   ParsedOneOf,
-  ParsedRef,
   ParsedSchema,
   ParsedString,
   PluginFile,
@@ -104,7 +103,7 @@ export interface DefinitionWriterConfig {
   date: DefinitionWriter<ParsedString>;
   string: DefinitionWriter<ParsedString>;
   key: DefinitionWriter<ParsedKey>;
-  boolean: DefinitionWriter<ParsedBoolean>;
+  boolean: DefinitionWriter<ParsedBool>;
   integer: DefinitionWriter<ParsedInteger>;
   float: DefinitionWriter<ParsedFloat>;
 }
@@ -183,13 +182,13 @@ export function defaultTypeObjectLiteralExpressionGetter(options: DefinitionWrit
           labelWriter,
         }),
       )
-      .with({ genericReferenceToSchema: { boolean: P.not(P.nullish) } }, (f) =>
+      .with({ genericReferenceToSchema: { bool: P.not(P.nullish) } }, (f) =>
         config.boolean({
           file,
           generatedFunction,
           fieldEnum,
           field: f,
-          generatedFieldSchema: generatedFieldSchema as GeneratedSchemaWithNode<ParsedBoolean>,
+          generatedFieldSchema: generatedFieldSchema as GeneratedSchemaWithNode<ParsedBool>,
           injectDependency,
           config,
           labelWriter,

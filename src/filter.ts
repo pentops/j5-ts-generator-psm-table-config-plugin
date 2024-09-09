@@ -3,7 +3,7 @@ import { camelCase, constantCase, pascalCase, sentenceCase } from 'change-case';
 import {
   GeneratedClientFunctionWithNodes,
   GeneratedSchemaWithNode,
-  ParsedBoolean,
+  ParsedBool,
   ParsedEnum,
   ParsedEnumValueDescription,
   ParsedFloat,
@@ -242,7 +242,7 @@ export const defaultDateFilterDefinitionBuilder: DefinitionWriter<ParsedString> 
     true,
   );
 
-export const defaultBooleanFilterDefinitionBuilder: DefinitionWriter<ParsedBoolean> = () =>
+export const defaultBooleanFilterDefinitionBuilder: DefinitionWriter<ParsedBool> = () =>
   factory.createObjectLiteralExpression([
     factory.createPropertyAssignment(ReactTableStatePSMFilterType.boolean, factory.createObjectLiteralExpression([])),
   ]);
