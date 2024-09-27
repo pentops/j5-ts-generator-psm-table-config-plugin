@@ -1,4 +1,4 @@
-import { SourceFile, SyntaxKind, ts } from 'ts-morph';
+import { SyntaxKind, ts } from 'ts-morph';
 import { camelCase, constantCase, pascalCase, sentenceCase } from 'change-case';
 import {
   GeneratedClientFunctionWithNodes,
@@ -11,7 +11,6 @@ import {
   ParsedKey,
   ParsedOneOf,
   ParsedString,
-  BasePluginFile,
 } from '@pentops/jsonapi-jdef-ts-generator';
 import {
   addTypeImportIfEnum,
@@ -29,6 +28,7 @@ import {
   REACT_TABLE_STATE_PSM_IMPORT_PATH,
   VariableNameWriter,
 } from './shared';
+import { PSMTableConfigPluginFile } from './plugin-file';
 
 const { factory } = ts;
 
@@ -77,7 +77,7 @@ export const defaultFilterDefinitionVariableNameWriter: DefinitionVariableNameWr
 export const defaultFilterLabelWriter: DefinitionLabelWriter = ({ field }) => sentenceCase(field.name.split('.').pop() || field.name);
 
 export const defaultFilterTypeReferenceWriter: DefinitionTypeReferenceWriter = (
-  file: BasePluginFile<SourceFile>,
+  file: PSMTableConfigPluginFile,
   _generatedFunction: GeneratedClientFunctionWithNodes,
   fieldEnum: GeneratedSchemaWithNode<ParsedEnum>,
 ) => {

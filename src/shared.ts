@@ -1,5 +1,5 @@
 import { match, P } from 'ts-pattern';
-import { SourceFile, Statement, SyntaxKind, ts } from 'ts-morph';
+import { Statement, SyntaxKind, ts } from 'ts-morph';
 import {
   GeneratedClientFunctionWithNodes,
   GeneratedSchemaWithNode,
@@ -12,12 +12,11 @@ import {
   ParsedOneOf,
   ParsedSchema,
   ParsedString,
-  BasePluginFile,
-  PluginFileGeneratorConfig,
-  PluginConfig,
   Optional,
+  IPluginConfig,
 } from '@pentops/jsonapi-jdef-ts-generator';
 import { sentenceCase } from 'change-case';
+import { PSMTableConfigPluginFile } from './plugin-file';
 
 const { factory } = ts;
 
@@ -25,7 +24,7 @@ export const REACT_TABLE_STATE_PSM_IMPORT_PATH = '@pentops/react-table-state-psm
 export const PSM_ID_PARAMETER_NAME = 'id';
 export const PSM_LABEL_PARAMETER_NAME = 'label';
 
-export interface PSMTablePluginConfig extends PluginConfig<SourceFile> {
+export interface PSMTablePluginConfig extends IPluginConfig<PSMTableConfigPluginFile> {
   statementConflictHandler: StatementConflictHandler;
   filter: {
     afterBuildInitialValuesNodeHook?: GeneratorHook;
@@ -75,15 +74,13 @@ export type PSMTablePluginSearchConfigInput = Optional<
 >;
 
 export type PSMTablePluginConfigInput = Optional<
-  Omit<PSMTablePluginConfig, 'filter' | 'search' | 'sort' | 'defaultExistingFileReader' | 'defaultFileHooks'> & {
+  Omit<PSMTablePluginConfig, 'filter' | 'search' | 'sort' | 'defaultExistingFileReader' | 'hooks'> & {
     filter: PSMTablePluginFilterConfigInput;
     search: PSMTablePluginSearchConfigInput;
     sort: PSMTablePluginSortConfigInput;
   },
   'filter' | 'sort' | 'statementConflictHandler'
 >;
-
-export type PSMTableConfigPluginFile = BasePluginFile<SourceFile, PluginFileGeneratorConfig<SourceFile>, PSMTablePluginConfig>;
 
 export type DefinitionTypeReferenceWriter = (
   file: PSMTableConfigPluginFile,

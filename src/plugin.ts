@@ -8,9 +8,9 @@ import {
   ParsedObject,
   ParsedOneOf,
   BasePlugin,
-  PluginFileGeneratorConfig,
-  PluginFilePostBuildHook,
-  PluginFileReader,
+  GeneratorFileReader,
+  IWritableFile,
+  PluginEventHandlers,
 } from '@pentops/jsonapi-jdef-ts-generator';
 import { match, P } from 'ts-pattern';
 import { Project, SourceFile, Statement, SyntaxKind, ts } from 'ts-morph';
@@ -33,7 +33,6 @@ import {
   defaultStatementConflictHandler,
   DependencyInjectorFunction,
   PSM_ID_PARAMETER_NAME,
-  PSMTableConfigPluginFile,
   PSMTablePluginConfig,
   PSMTablePluginConfigInput,
   REACT_TABLE_STATE_PSM_IMPORT_PATH,
@@ -45,10 +44,12 @@ import {
   defaultSearchTypeReferenceWriter,
 } from './search';
 import { defaultSortVariableNameWriter, PSM_DESC_PARAMETER_NAME, SORTING_STATE_TYPE_NAME } from './sort';
+import { PSMTableConfigPluginFile, PSMTableConfigPluginFileConfig } from './plugin-file';
+import type { IPluginRunOutput } from '@pentops/jsonapi-jdef-ts-generator/dist/plugin/types';
 
 const { factory } = ts;
 
-export const pluginFileReader: PluginFileReader<SourceFile> = async (filePath) => {
+export const pluginFileReader: GeneratorFileReader<SourceFile> = async (filePath) => {
   try {
     return new Project({ useInMemoryFileSystem: true }).addSourceFileAtPath(filePath);
   } catch {
@@ -80,26 +81,21 @@ function findMatchingVariableStatement(needle: Statement, haystack: Statement[])
   return undefined;
 }
 
-export class PSMTableConfigPlugin extends BasePlugin<
-  SourceFile,
-  PluginFileGeneratorConfig<SourceFile>,
-  PSMTablePluginConfig,
-  PSMTableConfigPluginFile
-> {
+export class PSMTableConfigPlugin extends BasePlugin<SourceFile, PSMTableConfigPluginFileConfig, PSMTableConfigPluginFile, PSMTablePluginConfig> {
   name = 'PSMTableConfigPlugin';
 
-  private static getPostBuildHook(baseConfig: Omit<PSMTablePluginConfig, 'defaultFileHooks'>) {
-    const mergedPostBuildHook: PluginFilePostBuildHook<SourceFile> = async (file, fileToWrite) => {
-      const { content } = fileToWrite;
+  private static getPostBuildHook(baseConfig: Omit<PSMTablePluginConfig, 'hooks'>) {
+    const mergedPostBuildHook: PluginEventHandlers<PSMTableConfigPluginFile>['postBuildFile'] = async ({ file, fileToBuild }) => {
+      const { content } = fileToBuild;
 
-      const existingFileContent = await file.getExistingFileContent();
+      const existingFileContent = (await file.pollForExistingFileContent())?.content;
 
       if (!existingFileContent) {
         return content;
       }
 
       // Check for existing content and merge it with the new content
-      const newFileAsSourceFile = new Project({ useInMemoryFileSystem: true }).createSourceFile(fileToWrite.fileName, content);
+      const newFileAsSourceFile = new Project({ useInMemoryFileSystem: true }).createSourceFile(fileToBuild.fileName, content);
 
       const newFileStatements = newFileAsSourceFile.getStatements();
       const existingFileStatements = existingFileContent.getStatements() || [];
@@ -199,8 +195,9 @@ export class PSMTableConfigPlugin extends BasePlugin<
 
     return {
       ...baseConfig,
-      defaultFileHooks: {
-        postBuildHook: PSMTableConfigPlugin.getPostBuildHook(baseConfig),
+      hooks: {
+        ...(baseConfig.hooks || {}),
+        postBuildFile: PSMTableConfigPlugin.getPostBuildHook(baseConfig),
       },
     };
   }
@@ -642,7 +639,7 @@ export class PSMTableConfigPlugin extends BasePlugin<
     }
   }
 
-  async run() {
+  async run(): Promise<IPluginRunOutput<PSMTableConfigPluginFile>> {
     for (const file of this.files) {
       for (const generatedFunction of this.generatedClientFunctions) {
         if (file.isFileForGeneratedClientFunction(generatedFunction)) {
@@ -657,5 +654,11 @@ export class PSMTableConfigPlugin extends BasePlugin<
         file.generateHeading();
       }
     }
+
+    const out = await this.buildFiles();
+
+    return {
+      files: out.reduce<IWritableFile<SourceFile>[]>((acc, curr) => (curr ? [...acc, curr] : acc), []),
+    };
   }
 }
