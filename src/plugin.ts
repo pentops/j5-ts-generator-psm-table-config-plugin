@@ -85,8 +85,8 @@ export class PSMTableConfigPlugin extends BasePlugin<SourceFile, PSMTableConfigP
   name = 'PSMTableConfigPlugin';
 
   private static getPostBuildHook(baseConfig: Omit<PSMTablePluginConfig, 'hooks'>) {
-    const mergedPostBuildHook: PluginEventHandlers<PSMTableConfigPluginFile>['postBuildFile'] = async ({ file, fileToBuild }) => {
-      const { content } = fileToBuild;
+    const mergedPostBuildHook: PluginEventHandlers<PSMTableConfigPluginFile>['postBuildFile'] = async ({ file, builtFile }) => {
+      const { content } = builtFile;
 
       const existingFileContent = (await file.pollForExistingFileContent())?.content;
 
@@ -95,7 +95,7 @@ export class PSMTableConfigPlugin extends BasePlugin<SourceFile, PSMTableConfigP
       }
 
       // Check for existing content and merge it with the new content
-      const newFileAsSourceFile = new Project({ useInMemoryFileSystem: true }).createSourceFile(fileToBuild.fileName, content);
+      const newFileAsSourceFile = new Project({ useInMemoryFileSystem: true }).createSourceFile(builtFile.fileName, content);
 
       const newFileStatements = newFileAsSourceFile.getStatements();
       const existingFileStatements = existingFileContent.getStatements() || [];
