@@ -12,7 +12,10 @@ import {
   ParsedOneOf,
   ParsedSchema,
   ParsedString,
-  PluginFile,
+  BasePluginFile,
+  PluginFileGeneratorConfig,
+  PluginConfig,
+  Optional,
 } from '@pentops/jsonapi-jdef-ts-generator';
 import { sentenceCase } from 'change-case';
 
@@ -22,8 +25,68 @@ export const REACT_TABLE_STATE_PSM_IMPORT_PATH = '@pentops/react-table-state-psm
 export const PSM_ID_PARAMETER_NAME = 'id';
 export const PSM_LABEL_PARAMETER_NAME = 'label';
 
+export interface PSMTablePluginConfig extends PluginConfig<SourceFile> {
+  statementConflictHandler: StatementConflictHandler;
+  filter: {
+    afterBuildInitialValuesNodeHook?: GeneratorHook;
+    afterBuildDefinitionHook?: DefinitionHook;
+    definitionVariableNameWriter: DefinitionVariableNameWriter;
+    initialValuesVariableNameWriter: VariableNameWriter;
+    typeDefinitionWriter: DefinitionWriter;
+    typeDefinitionWriterConfig: DefinitionWriterConfig;
+    typeReferenceWriter: DefinitionTypeReferenceWriter;
+    labelWriter: DefinitionLabelWriter;
+  };
+  search: {
+    afterBuildDefinitionHook?: DefinitionHook;
+    definitionVariableNameWriter: DefinitionVariableNameWriter;
+    typeDefinitionWriter: DefinitionWriter;
+    typeDefinitionWriterConfig: DefinitionWriterConfig;
+    typeReferenceWriter: DefinitionTypeReferenceWriter;
+    labelWriter: DefinitionLabelWriter;
+  };
+  sort: {
+    afterBuildInitialValuesNodeHook?: GeneratorHook;
+    initialValuesVariableNameWriter: VariableNameWriter;
+  };
+}
+
+export type PSMTablePluginTypeDefinitionWriterConfigInput = Partial<DefinitionWriterConfig>;
+
+export type PSMTablePluginFilterConfigInput = Optional<
+  Omit<PSMTablePluginConfig['filter'], 'typeDefinitionWriterConfig'> & {
+    typeDefinitionWriterConfig: PSMTablePluginTypeDefinitionWriterConfigInput;
+  },
+  | 'definitionVariableNameWriter'
+  | 'initialValuesVariableNameWriter'
+  | 'typeDefinitionWriter'
+  | 'typeDefinitionWriterConfig'
+  | 'typeReferenceWriter'
+  | 'labelWriter'
+>;
+
+export type PSMTablePluginSortConfigInput = Optional<PSMTablePluginConfig['sort'], 'initialValuesVariableNameWriter'>;
+
+export type PSMTablePluginSearchConfigInput = Optional<
+  Omit<PSMTablePluginConfig['search'], 'typeDefinitionWriterConfig'> & {
+    typeDefinitionWriterConfig: PSMTablePluginTypeDefinitionWriterConfigInput;
+  },
+  'definitionVariableNameWriter' | 'typeDefinitionWriter' | 'typeDefinitionWriterConfig' | 'typeReferenceWriter' | 'labelWriter'
+>;
+
+export type PSMTablePluginConfigInput = Optional<
+  Omit<PSMTablePluginConfig, 'filter' | 'search' | 'sort' | 'defaultExistingFileReader' | 'defaultFileHooks'> & {
+    filter: PSMTablePluginFilterConfigInput;
+    search: PSMTablePluginSearchConfigInput;
+    sort: PSMTablePluginSortConfigInput;
+  },
+  'filter' | 'sort' | 'statementConflictHandler'
+>;
+
+export type PSMTableConfigPluginFile = BasePluginFile<SourceFile, PluginFileGeneratorConfig<SourceFile>, PSMTablePluginConfig>;
+
 export type DefinitionTypeReferenceWriter = (
-  file: PluginFile<SourceFile>,
+  file: PSMTableConfigPluginFile,
   generatedFunction: GeneratedClientFunctionWithNodes,
   fieldEnum: GeneratedSchemaWithNode<ParsedEnum>,
 ) => ts.TypeNode;
@@ -35,7 +98,7 @@ export type VariableNameWriter = (generatedFunction: GeneratedClientFunctionWith
 export interface GeneratorHookOptions {
   generatedStatement: ts.VariableStatement;
   generatedFunction: GeneratedClientFunctionWithNodes;
-  file: PluginFile<SourceFile>;
+  file: PSMTableConfigPluginFile;
 }
 
 export type GeneratorHook = (options: GeneratorHookOptions) => ts.VariableStatement;
@@ -43,7 +106,7 @@ export type GeneratorHook = (options: GeneratorHookOptions) => ts.VariableStatem
 export type DependencyInjectorFunction = (argumentName: string, typeReference: ts.TypeReferenceNode | string) => void;
 
 export interface DefinitionWriterOptions<TFieldSchema extends ParsedSchema = ParsedSchema> {
-  file: PluginFile<SourceFile>;
+  file: PSMTableConfigPluginFile;
   generatedFunction: GeneratedClientFunctionWithNodes;
   fieldEnum: GeneratedSchemaWithNode<ParsedEnum>;
   field: ParsedEnumValueDescription<TFieldSchema>;
@@ -108,7 +171,7 @@ export interface DefinitionWriterConfig {
   float: DefinitionWriter<ParsedFloat>;
 }
 
-export function addTypeImportIfEnum(file: PluginFile<SourceFile>, generatedSchema: GeneratedSchemaWithNode<ParsedEnum>) {
+export function addTypeImportIfEnum(file: PSMTableConfigPluginFile, generatedSchema: GeneratedSchemaWithNode<ParsedEnum>) {
   if (generatedSchema.node.kind === SyntaxKind.EnumDeclaration) {
     file.addGeneratedTypeImport(generatedSchema.generatedName);
   }

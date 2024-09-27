@@ -1,5 +1,5 @@
 import { SourceFile, SyntaxKind, ts } from 'ts-morph';
-import { GeneratedClientFunctionWithNodes, GeneratedSchemaWithNode, ParsedEnum, PluginFile } from '@pentops/jsonapi-jdef-ts-generator';
+import { GeneratedClientFunctionWithNodes, GeneratedSchemaWithNode, ParsedEnum, BasePluginFile } from '@pentops/jsonapi-jdef-ts-generator';
 import { camelCase, pascalCase, sentenceCase } from 'change-case';
 import {
   buildEnumIdExpression,
@@ -35,7 +35,7 @@ export const defaultSearchTypeDefinitionWriter: DefinitionWriter = (options) => 
 };
 
 export const defaultSearchTypeReferenceWriter: DefinitionTypeReferenceWriter = (
-  file: PluginFile<SourceFile>,
+  file: BasePluginFile<SourceFile>,
   _generatedFunction: GeneratedClientFunctionWithNodes,
   fieldEnum: GeneratedSchemaWithNode<ParsedEnum>,
 ) => {

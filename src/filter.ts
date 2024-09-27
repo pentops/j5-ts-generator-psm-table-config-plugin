@@ -11,7 +11,7 @@ import {
   ParsedKey,
   ParsedOneOf,
   ParsedString,
-  PluginFile,
+  BasePluginFile,
 } from '@pentops/jsonapi-jdef-ts-generator';
 import {
   addTypeImportIfEnum,
@@ -77,7 +77,7 @@ export const defaultFilterDefinitionVariableNameWriter: DefinitionVariableNameWr
 export const defaultFilterLabelWriter: DefinitionLabelWriter = ({ field }) => sentenceCase(field.name.split('.').pop() || field.name);
 
 export const defaultFilterTypeReferenceWriter: DefinitionTypeReferenceWriter = (
-  file: PluginFile<SourceFile>,
+  file: BasePluginFile<SourceFile>,
   _generatedFunction: GeneratedClientFunctionWithNodes,
   fieldEnum: GeneratedSchemaWithNode<ParsedEnum>,
 ) => {

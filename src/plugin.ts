@@ -3,14 +3,11 @@ import {
   GeneratedSchemaWithNode,
   getFullGRPCName,
   getPropertyByPath,
-  Optional,
   ParsedEnum,
   ParsedEnumValueDescription,
   ParsedObject,
   ParsedOneOf,
-  PluginBase,
-  PluginConfig,
-  PluginFile,
+  BasePlugin,
   PluginFileGeneratorConfig,
   PluginFilePostBuildHook,
   PluginFileReader,
@@ -34,18 +31,12 @@ import {
 import {
   buildEnumIdExpression,
   defaultStatementConflictHandler,
-  DefinitionHook,
-  DefinitionLabelWriter,
-  DefinitionTypeReferenceWriter,
-  DefinitionVariableNameWriter,
-  DefinitionWriter,
-  DefinitionWriterConfig,
   DependencyInjectorFunction,
-  GeneratorHook,
   PSM_ID_PARAMETER_NAME,
+  PSMTableConfigPluginFile,
+  PSMTablePluginConfig,
+  PSMTablePluginConfigInput,
   REACT_TABLE_STATE_PSM_IMPORT_PATH,
-  StatementConflictHandler,
-  VariableNameWriter,
 } from './shared';
 import {
   defaultSearchDefinitionVariableNameWriter,
@@ -64,64 +55,6 @@ export const pluginFileReader: PluginFileReader<SourceFile> = async (filePath) =
     return undefined;
   }
 };
-
-export interface PSMTablePluginConfig extends PluginConfig<SourceFile> {
-  statementConflictHandler: StatementConflictHandler;
-  filter: {
-    afterBuildInitialValuesNodeHook?: GeneratorHook;
-    afterBuildDefinitionHook?: DefinitionHook;
-    definitionVariableNameWriter: DefinitionVariableNameWriter;
-    initialValuesVariableNameWriter: VariableNameWriter;
-    typeDefinitionWriter: DefinitionWriter;
-    typeDefinitionWriterConfig: DefinitionWriterConfig;
-    typeReferenceWriter: DefinitionTypeReferenceWriter;
-    labelWriter: DefinitionLabelWriter;
-  };
-  search: {
-    afterBuildDefinitionHook?: DefinitionHook;
-    definitionVariableNameWriter: DefinitionVariableNameWriter;
-    typeDefinitionWriter: DefinitionWriter;
-    typeDefinitionWriterConfig: DefinitionWriterConfig;
-    typeReferenceWriter: DefinitionTypeReferenceWriter;
-    labelWriter: DefinitionLabelWriter;
-  };
-  sort: {
-    afterBuildInitialValuesNodeHook?: GeneratorHook;
-    initialValuesVariableNameWriter: VariableNameWriter;
-  };
-}
-
-export type PSMTablePluginTypeDefinitionWriterConfigInput = Partial<DefinitionWriterConfig>;
-
-export type PSMTablePluginFilterConfigInput = Optional<
-  Omit<PSMTablePluginConfig['filter'], 'typeDefinitionWriterConfig'> & {
-    typeDefinitionWriterConfig: PSMTablePluginTypeDefinitionWriterConfigInput;
-  },
-  | 'definitionVariableNameWriter'
-  | 'initialValuesVariableNameWriter'
-  | 'typeDefinitionWriter'
-  | 'typeDefinitionWriterConfig'
-  | 'typeReferenceWriter'
-  | 'labelWriter'
->;
-
-export type PSMTablePluginSortConfigInput = Optional<PSMTablePluginConfig['sort'], 'initialValuesVariableNameWriter'>;
-
-export type PSMTablePluginSearchConfigInput = Optional<
-  Omit<PSMTablePluginConfig['search'], 'typeDefinitionWriterConfig'> & {
-    typeDefinitionWriterConfig: PSMTablePluginTypeDefinitionWriterConfigInput;
-  },
-  'definitionVariableNameWriter' | 'typeDefinitionWriter' | 'typeDefinitionWriterConfig' | 'typeReferenceWriter' | 'labelWriter'
->;
-
-export type PSMTablePluginConfigInput = Optional<
-  Omit<PSMTablePluginConfig, 'filter' | 'search' | 'sort' | 'defaultExistingFileReader' | 'defaultFileHooks'> & {
-    filter: PSMTablePluginFilterConfigInput;
-    search: PSMTablePluginSearchConfigInput;
-    sort: PSMTablePluginSortConfigInput;
-  },
-  'filter' | 'sort' | 'statementConflictHandler'
->;
 
 function findMatchingVariableStatement(needle: Statement, haystack: Statement[]) {
   if (needle.isKind(SyntaxKind.VariableStatement)) {
@@ -147,7 +80,12 @@ function findMatchingVariableStatement(needle: Statement, haystack: Statement[])
   return undefined;
 }
 
-export class PSMTableConfigPlugin extends PluginBase<SourceFile, PluginFileGeneratorConfig<SourceFile>, PSMTablePluginConfig> {
+export class PSMTableConfigPlugin extends BasePlugin<
+  SourceFile,
+  PluginFileGeneratorConfig<SourceFile>,
+  PSMTablePluginConfig,
+  PSMTableConfigPluginFile
+> {
   name = 'PSMTableConfigPlugin';
 
   private static getPostBuildHook(baseConfig: Omit<PSMTablePluginConfig, 'defaultFileHooks'>) {
@@ -276,7 +214,7 @@ export class PSMTableConfigPlugin extends PluginBase<SourceFile, PluginFileGener
     return fieldSchema ? this.generatedSchemas.get(getFullGRPCName(fieldSchema)) : undefined;
   }
 
-  private buildTableSearchFieldDefinitions(file: PluginFile<SourceFile>, generatedFunction: GeneratedClientFunctionWithNodes) {
+  private buildTableSearchFieldDefinitions(file: PSMTableConfigPluginFile, generatedFunction: GeneratedClientFunctionWithNodes) {
     const elements: ts.Expression[] = [];
     const searchDependencies = new Map<string, ts.TypeReferenceNode>();
 
@@ -369,7 +307,7 @@ export class PSMTableConfigPlugin extends PluginBase<SourceFile, PluginFileGener
     }
   }
 
-  private buildTableFilterDefinitions(file: PluginFile<SourceFile>, generatedFunction: GeneratedClientFunctionWithNodes) {
+  private buildTableFilterDefinitions(file: PSMTableConfigPluginFile, generatedFunction: GeneratedClientFunctionWithNodes) {
     const elements: ts.Expression[] = [];
     const filterDependencies = new Map<string, ts.TypeReferenceNode>();
 
@@ -462,7 +400,7 @@ export class PSMTableConfigPlugin extends PluginBase<SourceFile, PluginFileGener
     }
   }
 
-  private buildDefaultTableFilters(file: PluginFile<SourceFile>, generatedFunction: GeneratedClientFunctionWithNodes) {
+  private buildDefaultTableFilters(file: PSMTableConfigPluginFile, generatedFunction: GeneratedClientFunctionWithNodes) {
     if (generatedFunction.method.rootEntitySchema && generatedFunction.method.list?.filterableFields) {
       const elements: ts.Expression[] = [];
 
@@ -643,7 +581,7 @@ export class PSMTableConfigPlugin extends PluginBase<SourceFile, PluginFileGener
     }
   }
 
-  private buildDefaultTableSorts(file: PluginFile<SourceFile>, generatedFunction: GeneratedClientFunctionWithNodes) {
+  private buildDefaultTableSorts(file: PSMTableConfigPluginFile, generatedFunction: GeneratedClientFunctionWithNodes) {
     if (generatedFunction.method.rootEntitySchema && generatedFunction.method.list?.sortableFields) {
       const elements: ts.Expression[] = [];
 
