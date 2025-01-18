@@ -13,7 +13,7 @@ import {
   ParsedSchema,
   ParsedString,
   Optional,
-  IPluginConfig,
+  IPluginConfig, ParsedDate, ParsedTimestamp, ParsedDecimal, ParsedAny,
 } from '@pentops/jsonapi-jdef-ts-generator';
 import { sentenceCase } from 'change-case';
 import { PSMTableConfigPluginFile } from './plugin-file';
@@ -79,7 +79,7 @@ export type PSMTablePluginConfigInput = Optional<
     search: PSMTablePluginSearchConfigInput;
     sort: PSMTablePluginSortConfigInput;
   },
-  'filter' | 'sort' | 'statementConflictHandler'
+  'search' | 'filter' | 'sort' | 'statementConflictHandler'
 >;
 
 export type DefinitionTypeReferenceWriter = (
@@ -155,12 +155,22 @@ export type OneOfOptionLabelWriter = (options: OneOfOptionLabelWriterOptions) =>
 
 export const defaultOneOfOptionLabelWriter: OneOfOptionLabelWriter = ({ field }) => sentenceCase(field.name.split('.').pop() || field.name);
 
+export type AnyOptionLabelWriterOptions = Omit<DefinitionWriterOptions<ParsedAny>, 'config' | 'labelWriter'>;
+
+export type AnyOptionLabelWriter = (options: AnyOptionLabelWriterOptions) => string | ts.Expression | undefined;
+
+export const defaultAnyOptionLabelWriter: AnyOptionLabelWriter = ({ field }) => sentenceCase(field.name.split('.').pop() || field.name);
+
 export interface DefinitionWriterConfig {
   enum: DefinitionWriter<ParsedEnum>;
   enumOptionLabelWriter: EnumOptionLabelWriter;
+  any: DefinitionWriter<ParsedAny>;
+  anyOptionLabelWriter: AnyOptionLabelWriter;
   oneOf: DefinitionWriter<ParsedOneOf>;
   oneOfOptionLabelWriter: OneOfOptionLabelWriter;
-  date: DefinitionWriter<ParsedString>;
+  date: DefinitionWriter<ParsedDate>;
+  timestamp: DefinitionWriter<ParsedTimestamp>;
+  decimal: DefinitionWriter<ParsedDecimal>;
   string: DefinitionWriter<ParsedString>;
   key: DefinitionWriter<ParsedKey>;
   boolean: DefinitionWriter<ParsedBool>;
@@ -182,13 +192,49 @@ export function defaultTypeObjectLiteralExpressionGetter(options: DefinitionWrit
   if (idExpression) {
     return match(field)
       .returnType<ts.ObjectLiteralExpression | undefined>()
-      .with({ genericReferenceToSchema: { string: P.union({ format: 'date-time' }, { format: 'date' }) } }, (f) =>
+      .with({ genericReferenceToSchema: { any: P.not(P.nullish) } }, (f) =>
+        config.any({
+          file,
+          generatedFunction,
+          fieldEnum,
+          field: f,
+          generatedFieldSchema: generatedFieldSchema as GeneratedSchemaWithNode<ParsedAny>,
+          injectDependency,
+          config,
+          labelWriter,
+        }),
+      )
+      .with({ genericReferenceToSchema: { date: P.not(P.nullish) } }, (f) =>
         config.date({
           file,
           generatedFunction,
           fieldEnum,
           field: f,
-          generatedFieldSchema: generatedFieldSchema as GeneratedSchemaWithNode<ParsedString>,
+          generatedFieldSchema: generatedFieldSchema as GeneratedSchemaWithNode<ParsedDate>,
+          injectDependency,
+          config,
+          labelWriter,
+        }),
+      )
+      .with({ genericReferenceToSchema: { timestamp: P.not(P.nullish) } }, (f) =>
+        config.timestamp({
+          file,
+          generatedFunction,
+          fieldEnum,
+          field: f,
+          generatedFieldSchema: generatedFieldSchema as GeneratedSchemaWithNode<ParsedTimestamp>,
+          injectDependency,
+          config,
+          labelWriter,
+        }),
+      )
+      .with({ genericReferenceToSchema: { decimal: P.not(P.nullish) } }, (f) =>
+        config.decimal({
+          file,
+          generatedFunction,
+          fieldEnum,
+          field: f,
+          generatedFieldSchema: generatedFieldSchema as GeneratedSchemaWithNode<ParsedDecimal>,
           injectDependency,
           config,
           labelWriter,

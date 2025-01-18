@@ -2,19 +2,19 @@ import { SyntaxKind, ts } from 'ts-morph';
 import { camelCase, constantCase, pascalCase, sentenceCase } from 'change-case';
 import {
   GeneratedClientFunctionWithNodes,
-  GeneratedSchemaWithNode,
-  ParsedBool,
+  GeneratedSchemaWithNode, ParsedAny,
+  ParsedBool, ParsedDate, ParsedDecimal,
   ParsedEnum,
   ParsedEnumValueDescription,
   ParsedFloat,
   ParsedInteger,
   ParsedKey,
   ParsedOneOf,
-  ParsedString,
+  ParsedString, ParsedTimestamp,
 } from '@pentops/jsonapi-jdef-ts-generator';
 import {
   addTypeImportIfEnum,
-  buildEnumIdExpression,
+  buildEnumIdExpression, defaultAnyOptionLabelWriter,
   defaultEnumOptionLabelWriter,
   defaultOneOfOptionLabelWriter,
   defaultTypeObjectLiteralExpressionGetter,
@@ -48,6 +48,7 @@ export const REACT_TABLE_STATE_PSM_ONE_OF_FILTER_TYPE_OPTION_NAMES_OPTIONS = 'op
 export const REACT_TABLE_STATE_PSM_ONE_OF_FILTER_TYPE_OPTION_NAMES_VALUE = 'value';
 export const REACT_TABLE_STATE_PSM_ONE_OF_FILTER_TYPE_OPTION_NAMES_LABEL = 'label';
 export const REACT_TABLE_STATE_PSM_DATE_FILTER_TYPE_OPTION_NAMES_ALLOW_TIME = 'allowTime';
+export const REACT_TABLE_STATE_PSM_ANY_FILTER_TYPE_OPTION_NAMES_OPTIONS = 'options';
 
 export enum ReactTableStatePSMFilterType {
   enum = 'enum',
@@ -56,6 +57,7 @@ export enum ReactTableStatePSMFilterType {
   numeric = 'numeric',
   string = 'string',
   boolean = 'boolean',
+  any = 'any',
 }
 
 export const defaultFilterVariableNameWriter: VariableNameWriter = (generatedFunction: GeneratedClientFunctionWithNodes) =>
@@ -226,7 +228,7 @@ export const defaultKeyFilterDefinitionBuilder: DefinitionWriter<ParsedKey> = ()
     factory.createPropertyAssignment(ReactTableStatePSMFilterType.string, factory.createObjectLiteralExpression([])),
   ]);
 
-export const defaultDateFilterDefinitionBuilder: DefinitionWriter<ParsedString> = ({ field }) =>
+export const defaultDateFilterDefinitionBuilder: DefinitionWriter<ParsedDate> = () =>
   factory.createObjectLiteralExpression(
     [
       factory.createPropertyAssignment(
@@ -234,13 +236,34 @@ export const defaultDateFilterDefinitionBuilder: DefinitionWriter<ParsedString> 
         factory.createObjectLiteralExpression([
           factory.createPropertyAssignment(
             REACT_TABLE_STATE_PSM_DATE_FILTER_TYPE_OPTION_NAMES_ALLOW_TIME,
-            field.genericReferenceToSchema?.string.format === 'date-time' ? factory.createTrue() : factory.createFalse(),
+            factory.createFalse(),
           ),
         ]),
       ),
     ],
     true,
   );
+
+export const defaultTimestampFilterDefinitionBuilder: DefinitionWriter<ParsedTimestamp> = () =>
+  factory.createObjectLiteralExpression(
+    [
+      factory.createPropertyAssignment(
+        ReactTableStatePSMFilterType.date,
+        factory.createObjectLiteralExpression([
+          factory.createPropertyAssignment(
+            REACT_TABLE_STATE_PSM_DATE_FILTER_TYPE_OPTION_NAMES_ALLOW_TIME,
+            factory.createTrue(),
+          ),
+        ]),
+      ),
+    ],
+    true,
+  );
+
+export const defaultDecimalFilterDefinitionBuilder: DefinitionWriter<ParsedDecimal> = () =>
+  factory.createObjectLiteralExpression([
+    factory.createPropertyAssignment(ReactTableStatePSMFilterType.numeric, factory.createObjectLiteralExpression([])),
+  ]);
 
 export const defaultBooleanFilterDefinitionBuilder: DefinitionWriter<ParsedBool> = () =>
   factory.createObjectLiteralExpression([
@@ -257,12 +280,44 @@ export const defaultFloatFilterDefinitionBuilder: DefinitionWriter<ParsedFloat> 
     factory.createPropertyAssignment(ReactTableStatePSMFilterType.numeric, factory.createObjectLiteralExpression([])),
   ]);
 
+export const defaultAnyFilterDefinitionBuilder: DefinitionWriter<ParsedAny> = (options) => {
+  // const optionExpressions: ts.Expression[] = [];
+
+  // return factory.createObjectLiteralExpression(
+  //   [
+  //     factory.createPropertyAssignment(
+  //       ReactTableStatePSMFilterType.any,
+  //       factory.createObjectLiteralExpression(
+  //         [
+  //           factory.createPropertyAssignment(
+  //             REACT_TABLE_STATE_PSM_ANY_FILTER_TYPE_OPTION_NAMES_OPTIONS,
+  //             factory.createArrayLiteralExpression(optionExpressions, true),
+  //           ),
+  //         ],
+  //         true,
+  //       ),
+  //     ),
+  //   ],
+  //   true,
+  // );
+
+  // TODO: implement select for options
+
+  return factory.createObjectLiteralExpression([
+    factory.createPropertyAssignment(ReactTableStatePSMFilterType.numeric, factory.createObjectLiteralExpression([])),
+  ]);
+}
+
 export const defaultDefinitionWriterConfig: DefinitionWriterConfig = {
+  any: defaultAnyFilterDefinitionBuilder,
+  anyOptionLabelWriter: defaultAnyOptionLabelWriter,
   enum: defaultEnumFilterDefinitionBuilder,
   enumOptionLabelWriter: defaultEnumOptionLabelWriter,
   oneOf: defaultOneOfFilterDefinitionBuilder,
   oneOfOptionLabelWriter: defaultOneOfOptionLabelWriter,
   date: defaultDateFilterDefinitionBuilder,
+  timestamp: defaultTimestampFilterDefinitionBuilder,
+  decimal: defaultDecimalFilterDefinitionBuilder,
   string: defaultStringFilterDefinitionBuilder,
   key: defaultKeyFilterDefinitionBuilder,
   boolean: defaultBooleanFilterDefinitionBuilder,

@@ -413,6 +413,9 @@ export class PSMTableConfigPlugin extends BasePlugin<SourceFile, PSMTableConfigP
             .with(
               P.union(
                 { rawSchema: { string: P.not(P.nullish) } },
+                { rawSchema: { date: P.not(P.nullish) } },
+                { rawSchema: { timestamp: P.not(P.nullish) } },
+                { rawSchema: { decimal: P.not(P.nullish) } },
                 { rawSchema: { integer: P.not(P.nullish) } },
                 { rawSchema: { float: P.not(P.nullish) } },
               ),
