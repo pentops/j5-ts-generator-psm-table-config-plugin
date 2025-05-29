@@ -13,7 +13,7 @@ import {
   ParsedSchema,
   ParsedString,
   Optional,
-  IPluginConfig, ParsedDate, ParsedTimestamp, ParsedDecimal, ParsedAny,
+  IPluginConfig, ParsedDate, ParsedTimestamp, ParsedDecimal, ParsedAny, ParsedPolymorph,
 } from '@pentops/jsonapi-jdef-ts-generator';
 import { sentenceCase } from 'change-case';
 import { PSMTableConfigPluginFile } from './plugin-file';
@@ -155,6 +155,12 @@ export type OneOfOptionLabelWriter = (options: OneOfOptionLabelWriterOptions) =>
 
 export const defaultOneOfOptionLabelWriter: OneOfOptionLabelWriter = ({ field }) => sentenceCase(field.name.split('.').pop() || field.name);
 
+export type PolymorphOptionLabelWriterOptions = Omit<DefinitionWriterOptions<ParsedPolymorph>, 'config' | 'labelWriter'>;
+
+export type PolymorphOptionLabelWriter = (options: PolymorphOptionLabelWriterOptions) => string | ts.Expression | undefined;
+
+export const defaultPolymorphOptionLabelWriter: PolymorphOptionLabelWriter = ({ field }) => sentenceCase(field.name.split('.').pop() || field.name);
+
 export type AnyOptionLabelWriterOptions = Omit<DefinitionWriterOptions<ParsedAny>, 'config' | 'labelWriter'>;
 
 export type AnyOptionLabelWriter = (options: AnyOptionLabelWriterOptions) => string | ts.Expression | undefined;
@@ -168,6 +174,8 @@ export interface DefinitionWriterConfig {
   anyOptionLabelWriter: AnyOptionLabelWriter;
   oneOf: DefinitionWriter<ParsedOneOf>;
   oneOfOptionLabelWriter: OneOfOptionLabelWriter;
+  polymorph: DefinitionWriter<ParsedPolymorph>;
+  polymorphOptionLabelWriter: PolymorphOptionLabelWriter;
   date: DefinitionWriter<ParsedDate>;
   timestamp: DefinitionWriter<ParsedTimestamp>;
   decimal: DefinitionWriter<ParsedDecimal>;
@@ -199,6 +207,18 @@ export function defaultTypeObjectLiteralExpressionGetter(options: DefinitionWrit
           fieldEnum,
           field: f,
           generatedFieldSchema: generatedFieldSchema as GeneratedSchemaWithNode<ParsedAny>,
+          injectDependency,
+          config,
+          labelWriter,
+        }),
+      )
+      .with({ genericReferenceToSchema: { polymorph: P.not(P.nullish) } }, (f) =>
+        config.polymorph({
+          file,
+          generatedFunction,
+          fieldEnum,
+          field: f,
+          generatedFieldSchema: generatedFieldSchema as GeneratedSchemaWithNode<ParsedPolymorph>,
           injectDependency,
           config,
           labelWriter,

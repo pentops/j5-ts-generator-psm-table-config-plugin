@@ -9,14 +9,14 @@ import {
   ParsedFloat,
   ParsedInteger,
   ParsedKey,
-  ParsedOneOf,
+  ParsedOneOf, ParsedPolymorph,
   ParsedString, ParsedTimestamp,
 } from '@pentops/jsonapi-jdef-ts-generator';
 import {
   addTypeImportIfEnum,
   buildEnumIdExpression, defaultAnyOptionLabelWriter,
   defaultEnumOptionLabelWriter,
-  defaultOneOfOptionLabelWriter,
+  defaultOneOfOptionLabelWriter, defaultPolymorphOptionLabelWriter,
   defaultTypeObjectLiteralExpressionGetter,
   DefinitionLabelWriter,
   DefinitionTypeReferenceWriter,
@@ -48,7 +48,7 @@ export const REACT_TABLE_STATE_PSM_ONE_OF_FILTER_TYPE_OPTION_NAMES_OPTIONS = 'op
 export const REACT_TABLE_STATE_PSM_ONE_OF_FILTER_TYPE_OPTION_NAMES_VALUE = 'value';
 export const REACT_TABLE_STATE_PSM_ONE_OF_FILTER_TYPE_OPTION_NAMES_LABEL = 'label';
 export const REACT_TABLE_STATE_PSM_DATE_FILTER_TYPE_OPTION_NAMES_ALLOW_TIME = 'allowTime';
-export const REACT_TABLE_STATE_PSM_ANY_FILTER_TYPE_OPTION_NAMES_OPTIONS = 'options';
+export const REACT_TABLE_STATE_PSM_POLYMORPH_FILTER_TYPE_OPTION_NAMES_OPTIONS = 'options';
 
 export enum ReactTableStatePSMFilterType {
   enum = 'enum',
@@ -57,7 +57,7 @@ export enum ReactTableStatePSMFilterType {
   numeric = 'numeric',
   string = 'string',
   boolean = 'boolean',
-  any = 'any',
+  polymorph = 'polymorph',
 }
 
 export const defaultFilterVariableNameWriter: VariableNameWriter = (generatedFunction: GeneratedClientFunctionWithNodes) =>
@@ -304,7 +304,14 @@ export const defaultAnyFilterDefinitionBuilder: DefinitionWriter<ParsedAny> = (o
   // TODO: implement select for options
 
   return factory.createObjectLiteralExpression([
-    factory.createPropertyAssignment(ReactTableStatePSMFilterType.numeric, factory.createObjectLiteralExpression([])),
+    factory.createPropertyAssignment(ReactTableStatePSMFilterType.string, factory.createObjectLiteralExpression([])),
+  ]);
+}
+
+export const defaultPolymorphFilterDefinitionBuilder: DefinitionWriter<ParsedPolymorph> = (options) => {
+  // TODO: implement select for options
+  return factory.createObjectLiteralExpression([
+    factory.createPropertyAssignment(ReactTableStatePSMFilterType.string, factory.createObjectLiteralExpression([])),
   ]);
 }
 
@@ -315,6 +322,8 @@ export const defaultDefinitionWriterConfig: DefinitionWriterConfig = {
   enumOptionLabelWriter: defaultEnumOptionLabelWriter,
   oneOf: defaultOneOfFilterDefinitionBuilder,
   oneOfOptionLabelWriter: defaultOneOfOptionLabelWriter,
+  polymorph: defaultPolymorphFilterDefinitionBuilder,
+  polymorphOptionLabelWriter: defaultPolymorphOptionLabelWriter,
   date: defaultDateFilterDefinitionBuilder,
   timestamp: defaultTimestampFilterDefinitionBuilder,
   decimal: defaultDecimalFilterDefinitionBuilder,
